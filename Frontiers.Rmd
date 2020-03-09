@@ -1,0 +1,492 @@
+---
+title: "Clusterização de dados para descoberta do contexto da corrrelação entre multi/interdisciplinaridade e produção de tecnologias"
+author: "Métricas: Viviane Alves. Análise estatística e Código fonte: Viviane Schneider"
+date: "inicio em 20/02/2020"
+output: 
+  html_document: 
+    highlight: zenburn
+    keep_md: yes
+    number_sections: yes
+    theme: cerulean
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+
+setwd("~/Artigo_Frontiers")
+
+```
+
+# Contexto do Estudo
+
+A análise  
+
+**Objetivo do estudo:** O objetivo do estudo é aplicar técnicas de machine learning para estabelecer o contexto dos programas de pós-graduação que possuem correlação positiva entre Perfil multi/interdisciplinar e produção de tecnologias.
+
+**Pergunta de pesquisa:** Quais as características do contexto contexto dos programas de pós-graduação que possuem correlação positiva entre Perfil multi/interdisciplinar e produção de tecnologias?
+
+**Recorte de análise:** Dados dos programas de pós-graduação entre os anos 2013 até 2016.
+
+# Método e materiais
+
+
+.....
+
+## Fonte de Dados
+
+1. Data from Lattes Platform - Extract by Instituto Stela
+2. Data from Sucupira Platform
+
+
+```{r echo=TRUE}
+library(dplyr)
+library(plotly)
+library(ggplot2)
+library(tidyr)
+library(magrittr)
+library(plotrix)
+library(rgl)
+library(car)
+library(lubridate)
+library(ggplot2)
+library(GGally)
+library(corrplot)
+library(corrgram)
+library(ppcor)
+library(plyr)
+library(ggpubr)
+library(fastcluster)
+library(cluster)
+
+.Unianalysis = function (x) {
+    y <- as.data.frame(table(x))
+    y <- arrange(y, desc(y$Freq))
+         return(y)
+}
+
+```
+
+
+
+
+```{r Import, echo=TRUE, message=FALSE, warning=FALSE}
+#Import Data
+library(readr)
+IMI <- read_delim("IMI.csv", ";", escape_double = FALSE, 
+    trim_ws = TRUE)
+
+IPT <- read_delim("IPT.csv", ";", escape_double = FALSE, 
+    trim_ws = TRUE)
+
+Estados <- read_delim("Estados.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+
+
+IMI_IPT <- merge(IMI, IPT, by = "CD_PROGRAMA_IES", all.x = TRUE)
+
+write.csv2(IMI_IPT, file = "IMI_IPT.csv", fileEncoding = "UTF-8")
+
+
+```
+
+# Tidyng
+
+## DS_DEPENDENCIA_ADMINISTRATIVA
+
+PUBLICA = 0
+PRIVADA = 1
+
+## NM_MODALIDADE_PROGRAMA
+
+ACADEMICO = 0
+PROFISSIONAL = 1
+
+## CS_STATUS_JURIDICO
+
+MUNICIPAL = 1
+ESTADUAL = 2
+FEDERAL = 3
+PARTICULAR = 4
+
+## Rename Variables
+
+```{r}
+
+IMI_IPT_Tidy <- read_delim("IMI_IPT_Tidy.csv", 
+    ";", escape_double = FALSE, col_types = cols(ANO_INICIO_PROGRAMA = col_number(), 
+        App_prof = col_number(), CD_CONCEITO_PROGRAMA = col_number(), 
+        CP = col_number(), CS_STATUS_JURIDICO = col_number(), 
+        Colabora_cientifica = col_number(), 
+        Count = col_number(), DS_DEPENDENCIA_ADMINISTRATIVA = col_number(), 
+        Forma_discente = col_number(), Forma_docente = col_number(), 
+        Indice_MI = col_number(), Indice_PT = col_number(), 
+        NM_MODALIDADE_PROGRAMA = col_number(), 
+        Patente_prof = col_number(), Produto_prof = col_number(), 
+        Prof_Perm = col_number(), Soma_Aplicativos = col_number(), 
+        Soma_patentes = col_number(), Soma_produtos = col_number()), 
+    trim_ws = TRUE)
+
+IMI_IPT_T1<- IMI_IPT_Tidy %>%
+              mutate(new_indice_PT = (Soma_Aplicativos+Soma_produtos+Soma_patentes)/Prof_Perm)
+
+M_State <- merge(IMI_IPT_T1, Estados, by = "CD_PROGRAMA_IES", all.x = TRUE)
+
+write.csv2(IMI_IPT_T1, file = "IMI_IPT_T1.csv", fileEncoding = "UTF-8")
+
+write.csv2(M_State, file = "M_State.csv", fileEncoding = "UTF-8")
+
+cor(IMI_IPT_T1$Indice_MI, IMI_IPT_T1$new_indice_PT, method = "pearson")
+
+```
+
+# With 3 full metrics of Technologies Production
+    
+```{r}
+
+IMI_IPT_Full_IPT <- IMI_IPT_T1 %>%
+              filter(Soma_Aplicativos > 0, Soma_patentes >0, Soma_patentes > 0)
+              
+
+dim(IMI_IPT_Full_IPT)
+
+summary(IMI_IPT_Full_IPT)
+
+corrplot(cor(IMI_IPT_Full_IPT[,3:21]), method = "color", tl.cex = 0.5)
+
+
+```
+
+# Start program after 2002 - Original metrics
+
+```{r}
+
+IMI_IPT_M2002 <- IMI_IPT_T1 %>%
+              filter(ANO_INICIO_PROGRAMA > 2002)
+             
+dim(IMI_IPT_M2002)
+
+summary(IMI_IPT_M2002)
+
+corrplot(cor(IMI_IPT_M2002[,3:22]), method = "color", tl.cex = 0.5)
+
+## Indice Total original
+
+cor(IMI_IPT_M2002$Indice_MI, IMI_IPT_M2002$Indice_PT, method = "pearson")
+
+## Indice Total novo
+
+cor(IMI_IPT_M2002$Indice_MI, IMI_IPT_M2002$new_indice_PT, method = "pearson")
+
+## Indice Formação docente
+
+cor(IMI_IPT_M2002$Forma_docente, IMI_IPT_M2002$new_indice_PT, method = "pearson")
+
+## Indice Formação discente
+
+cor(IMI_IPT_M2002$Forma_discente, IMI_IPT_M2002$new_indice_PT, method = "pearson")
+
+## Indice Calaboração cientifica
+
+cor(IMI_IPT_M2002$Colabora_cientifica, IMI_IPT_M2002$new_indice_PT, method = "pearson")
+
+## Indice contexto profissional
+
+cor(IMI_IPT_M2002$CP, IMI_IPT_M2002$new_indice_PT, method = "pearson")
+
+```
+
+# Correlation by private universities programs
+
+```{r}
+
+IMI_IPT_PRIV <- IMI_IPT_T1 %>%
+              filter(DS_DEPENDENCIA_ADMINISTRATIVA == 1)
+              
+dim(IMI_IPT_PRIV)
+
+summary(IMI_IPT_PRIV)
+
+corrplot(cor(IMI_IPT_PRIV[,3:22]), method = "color", tl.cex = 0.5)
+
+## Indice total original
+
+cor(IMI_IPT_PRIV$Indice_MI, IMI_IPT_PRIV$Indice_PT, method = "pearson")
+
+## Indice Total novo
+
+cor(IMI_IPT_PRIV$Indice_MI, IMI_IPT_PRIV$new_indice_PT, method = "pearson")
+
+## Indice Formação docente
+
+cor(IMI_IPT_PRIV$Forma_docente, IMI_IPT_PRIV$new_indice_PT, method = "pearson")
+
+## Indice Formação discente
+
+cor(IMI_IPT_PRIV$Forma_discente, IMI_IPT_PRIV$new_indice_PT, method = "pearson")
+
+## Indice Calaboração cientifica
+
+cor(IMI_IPT_PRIV$Colabora_cientifica, IMI_IPT_PRIV$new_indice_PT, method = "pearson")
+
+## Indice contexto profissional
+
+cor(IMI_IPT_PRIV$CP, IMI_IPT_PRIV$new_indice_PT, method = "pearson")
+
+
+```
+
+
+
+
+```{r message=FALSE, warning=FALSE}
+
+## Variaveis
+M <- IMI_IPT_T1
+# mu da amostra de produção de aplicativo
+Media_Indice_MI <- mean(M$Indice_MI, na.rm = TRUE)
+## mu de diversidade do universo: mu
+Media_Prod_tecno <- mean(M$Indice_PT, na.rm = TRUE)
+
+
+Context_m_acima <-
+            M %>%
+            dplyr::filter(Indice_MI > Media_Indice_MI, 
+                          Indice_PT > Media_Prod_tecno)
+
+summary(Context_m_acima)
+
+corrplot(cor(Context_m_acima[, 3:22]), method = "color", tl.cex = 0.5)
+
+## Indice total original
+
+cor(Context_m_acima$Indice_MI, Context_m_acima$Indice_PT, method = "pearson")
+
+## Indice Total novo
+
+cor(Context_m_acima$Indice_MI, Context_m_acima$new_indice_PT, method = "pearson")
+
+## Indice Formação docente
+
+cor(Context_m_acima$Forma_docente, Context_m_acima$new_indice_PT, method = "pearson")
+
+## Indice Formação discente
+
+cor(Context_m_acima$Forma_discente, Context_m_acima$new_indice_PT, method = "pearson")
+
+## Indice Calaboração cientifica
+
+cor(Context_m_acima$Colabora_cientifica, Context_m_acima$new_indice_PT, method = "pearson")
+
+## Indice contexto profissional
+
+cor(Context_m_acima$CP, Context_m_acima$new_indice_PT, method = "pearson")
+
+
+
+```
+
+# Hierarquical cluster analysis
+
+## Metrics above and start in 2003
+
+# Non-Hierarquical cluster analysis
+
+## Metrics above and start in 2003
+
+
+
+Contex_Full <- M_State %>%
+        dplyr::select(CD_PROGRAMA_IES, Indice_MI, new_indice_PT) 
+
+Contex_Full <- na.omit(Contex_Full)
+Distances <- dist(Contex_Full)
+dendrogram <- hclust(Distances)
+plot(dendrogram) 
+rect.hclust(dendrogram, k=6, border=1:3)
+
+plot(hclust(Distances, method="ward.D"), main="ward.D", hang=-1)
+rect.hclust(hclust(Distances, method="ward.D"), k=5, border=1:5)
+
+plot(hclust(Distances, method="centroid"), main="centroid", hang=-1)
+rect.hclust(hclust(Distances, method="centroid"), k=5, border=1:5)
+
+Kmeans_HW<-kmeans(Contex_Full,100 , iter.max = 5, nstart = 25,
+       algorithm = c("Hartigan-Wong"), trace=FALSE)
+HartiganWong<- cor(Kmeans_HW$centers[,2:2], Kmeans_HW$centers[,3:3] , method = "pearson")
+
+plot(Contex_Full, col = Kmeans_HW$cluster)
+points(Kmeans_HW$centers, col = 1:2, pch = 8, cex = 2)
+
+```
+
+Kmeans_Fo<- kmeans(Contex_Full, 10, iter.max = 5, nstart = 1,
+       algorithm = c("Forgy"), trace=FALSE)
+Forgy <- cor(Kmeans_Fo$centers[,2:2], Kmeans_Fo$centers[,3:3] , method = "pearson")
+
+Kmeans_Ma<- kmeans(Contex_Full, 10, iter.max = 5, nstart = 1,
+       algorithm = c("MacQueen"), trace=FALSE)
+MacQueen <- cor(Kmeans_Ma$centers[,2:2], Kmeans_Ma$centers[,3:3] , method = "pearson")
+
+```
+
+
+
+# Indices Originais
+
+## Universo por estado
+
+
+```{r}
+
+By_State <-
+         M_State %>%
+         dplyr::group_by(SG_UF_PROGRAMA) %>%
+         dplyr::summarise(Patentes_total = sum(Soma_patentes),
+                   Produtos_total = sum(Soma_produtos),
+                   Aplicativos_total = sum(Soma_Aplicativos),
+                   Programas_total = n_distinct(CD_PROGRAMA_IES),
+                   Professores_total = sum(Prof_Perm), 
+                   Indice_MI_S = sum(Indice_MI)/Programas_total, 
+                   Forma_docente = 1 / sum(Forma_docente),
+                   Forma_discente = 1/ sum(Forma_discente),
+                   Colabora_cientifica = 1/ sum(Colabora_cientifica),
+                   Contex_Profissa = 1/ sum(CP)) %>%
+                   mutate(Indice_MI_S = ((Forma_docente+Forma_discente+Colabora_cientifica+Contex_Profissa)/4)/Programas_total,
+                Indice_PT_S = (Patentes_total+Produtos_total+ Aplicativos_total)/Programas_total)
+
+
+cor(By_State$Indice_MI_S, By_State$Indice_PT_S, method = "spearman")
+
+cor(By_State$Forma_docente, By_State$Indice_PT_S, method = "spearman")
+
+DT::datatable(By_State)
+
+
+
+```
+
+
+
+
+kMeans1 <- function(dados, k=2){
+  
+  # função que calcula a distância euclidiana
+  euc.dist <- function(x1, x2) sum((x1 - x2) ^ 2)
+  
+  # labels
+  rotulo = 1:k
+  rownames(dados)[nrow(dados)]= 1
+  
+  # random centroids
+  for(i in 1:nrow(dados)){
+    rownames(dados)[i] <- sample(rotulo,1)
+  }
+  
+  centroids <- colMeans(dados[rownames(dados) == 1, ])
+  
+  for(j in 2:k){
+    centroids <- rbind(centroids, colMeans(dados[rownames(dados) == j, ]))
+  }
+
+  rownames(centroids) = 1:k #  identifica o centroide de cada grupo
+
+  for(i in 1:nrow(dados)){
+    distancias = NULL
+    for(j in 1:k){
+      distancias[j] = euc.dist(dados[i,], centroids[j,])
+    }
+    names(distancias) = 1:k
+ #   print(distancias)
+    rownames(dados)[i] = as.numeric(names(distancias[distancias == min(distancias)]))
+    
+    # recalcula as medias
+    
+     centroids <- colMeans(dados[rownames(dados) == 1, ])
+     
+     for(z in 2:k){
+       centroids <- rbind(centroids, colMeans(dados[rownames(dados) == z, ]))
+     }
+    
+    
+  }
+#  centroids
+  
+  return(list(centroides = centroids, grupo1 = dados[rownames(dados) == 1, ],
+              grupo2 = dados[rownames(dados) == 2, ],
+              grupo3 = dados[rownames(dados) == 3, ],
+              clusters = as.numeric(rownames(dados))))
+}
+
+dados = as.matrix(Context_m_acima[2:20])
+
+exemplo = kMeans1(dados,k=3)
+# exemplo$grupo1
+# exemplo$grupo2
+# exemplo$grupo3
+plot(dados,col = exemplo$clusters+1,  main="K-Means result with 3 clusters", pch=20, cex=2)
+```
+
+
+
+
+
+
+Contex_2002_Above <- IMI_IPT_M2002 %>%
+            dplyr::filter(Indice_MI > Media_Indice_MI, 
+                          Indice_PT > Media_Prod_tecno) %>%
+            dplyr::select(CD_CONCEITO_PROGRAMA, Indice_MI, new_indice_PT)
+
+
+Distances <- dist(Contex_2002_Above)
+dendrogram <- hclust(Distances)
+plot(dendrogram) 
+rect.hclust(dendrogram, k=6, border=1:3)
+
+plot(hclust(Distances, method="ward.D"), main="ward.D", hang=-1)
+rect.hclust(hclust(Distances, method="ward.D"), k=5, border=1:5)
+
+plot(hclust(Distances, method="centroid"), main="centroid", hang=-1)
+rect.hclust(hclust(Distances, method="centroid"), k=5, border=1:5)
+
+
+```
+
+
+
+
+
+
+Kmeans_HW<- kmeans(Contex_2002_Above,10 , iter.max = 5, nstart = 1,
+       algorithm = c("Hartigan-Wong"), trace=FALSE)
+HartiganWong<- cor(Kmeans_HW$centers[,2:2], Kmeans_HW$centers[,3:3] , method = "pearson")
+
+plot(Contex_2002_Above, col = Kmeans_HW$cluster)
+points(Kmeans_HW$centers, col = 1:2, pch = 8, cex = 2)
+
+Kmeans_Lo<- kmeans(Contex_2002_Above, 10, iter.max = 5, nstart = 1,
+       algorithm = c("Lloyd"), trace=FALSE)
+Lloyd <- cor(Kmeans_Lo$centers[,2:2], Kmeans_Lo$centers[,3:3] , method = "pearson")
+
+
+Kmeans_Fo<- kmeans(Contex_2002_Above, 10, iter.max = 5, nstart = 1,
+       algorithm = c("Forgy"), trace=FALSE)
+Forgy <- cor(Kmeans_Fo$centers[,2:2], Kmeans_Fo$centers[,3:3] , method = "pearson")
+
+Kmeans_Ma<- kmeans(Contex_2002_Above, 10, iter.max = 5, nstart = 1,
+       algorithm = c("MacQueen"), trace=FALSE)
+MacQueen <- cor(Kmeans_Ma$centers[,2:2], Kmeans_Ma$centers[,3:3] , method = "pearson")
+
+
+ResultsCor <- rbind(HartiganWong, Lloyd, Forgy,MacQueen)
+ResultsCor
+
+
+
+Kmeans_Lo<- kmeans(Contex_2002_Above, 10, iter.max = 5, nstart = 1,
+       algorithm = c("Lloyd"), trace=FALSE)
+Lloyd <- cor(Kmeans_Lo$centers[,2:2], Kmeans_Lo$centers[,3:3] , method = "pearson")
+
+ResultsCor <- rbind(HartiganWong, Lloyd, Forgy,MacQueen)
+ResultsCor
+
